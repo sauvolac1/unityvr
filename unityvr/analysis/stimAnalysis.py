@@ -20,7 +20,9 @@ def deriveTexVals(texDf,
               diskSize = 5, #morphological disk
               round=-1, #rounding to the nearest 10th in deg/sec
               screenAboveFly = 32, #for pentagonal display with each screen dimension = 9.5*5.8 cm, in degs, +ve
-              screenBelowFly = 60 #in degs, +ve
+              screenBelowFly = 60, #in degs, +ve,
+              behindScreenAngle = 72 #angle beyond which stimulus is behind the screen
+
              ):
     texDf = texDf.copy()
     texDf['stimAngle'] = (-texDf['azimuth'].values)%360-180 #convert to -180 to 180 left handed convention
@@ -36,7 +38,7 @@ def deriveTexVals(texDf,
     texDf['elevationDegs'] = elevationToDegs(texDf['elevation'].values).round(0)
     texDf['stimSpeed'] = np.abs(texDf['stimVel'])
     texDf['stimDir'] = np.sign(texDf['stimVel'])
-    texDf['behindScreen'] = np.abs(texDf['stimAngle'])>=(180-36);
+    texDf['behindScreen'] = np.abs(texDf['stimAngle'])>=(180-behindScreenAngle/2);
     return texDf
 
 def convertTextureVals(texDf, RF=True):
