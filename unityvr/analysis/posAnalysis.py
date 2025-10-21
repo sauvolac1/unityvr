@@ -167,7 +167,7 @@ def computeVelocities(inDf, ToFilter = True,  BoxCarWidth = 9):
         
     # Compute the translational velocity angle in world coordinates (0 degrees is y axis. 90 degrees is positive x axis)
     # Note: we compute vT_world_angle after the filtering step above because it's a circular variable so annoying to filter after computing it.
-    posDf['vT_world_angle']  =  np.arctan2( posDf['dx_world'], posDf['dy_world'] )/2/np.pi*360  # 0 degrees is y axis since arctan2(1,0) is 90 degrees. 
+    posDf['vT_world_angle']  =  np.arctan2( posDf['dy_world'], posDf['dx_world'] )/2/np.pi*360  # 0 degrees is y axis since arctan2(1,0) is 90 degrees. 
     #TODO: verify that this convention works with the zero defined by the brightest side. 
 
     # Compute the world's rotational velocity
@@ -208,7 +208,7 @@ def computeVelocities(inDf, ToFilter = True,  BoxCarWidth = 9):
         posDf['vL_fly']         =  posDf['vL_fly'].rolling(window = BoxCarWidth, center = True,  min_periods=1).mean() 
         
     # Lastly, compute the fly's egocentric translational angle. As above, we do this after filter because this is a circular variable. 
-    posDf['vT_fly_angle']  =  np.arctan2( posDf['dx_fly'], posDf['dy_fly'] )/2/np.pi*360  # 0 degrees is y axis since arctan2(1,0) is 90 degrees. 
+    posDf['vT_fly_angle']  =  np.arctan2( posDf['dy_fly'], posDf['dx_fly'] )/2/np.pi*360  # 0 degrees is y axis since arctan2(1,0) is 90 degrees. 
     #TODO: verify that this convention works with the zero defined by the brightest side.
     
     return posDf
