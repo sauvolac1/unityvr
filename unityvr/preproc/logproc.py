@@ -366,28 +366,28 @@ def dtDfFromLog(dat):
     else:
         return pd.DataFrame()
 
-
-def pdDfFromLog(dat, computePDtrace):
+## function to load signals from NI-DAQ
+def pdDfFromLog(dat, colKeyPairs={'imgFrameTrigger':'imgfsig', 'tracePD':'pdsig'}):
     # get NiDaq signal
-    matching = [s for s in dat if "imgFrameTrigger" in s]
+    matching = [s for s in dat if any(key in s for key in colKeyPairs)]
     entries = [None]*len(matching)
     for entry, match in enumerate(matching):
-        if computePDtrace:
-            framedat = {'frame': match['frame'],
+        """framedat = {'frame': match['frame'],
                         'time': match['timeSecs'],
                         'pdsig': match['tracePD'],
-                        'imgfsig': match['imgFrameTrigger']}
-        else:
-            framedat = {'frame': match['frame'],
-                    'time': match['timeSecs'],
-                    'imgfsig': match['imgFrameTrigger']}
+                        'imgfsig': match['imgFrameTrigger']}"""
+        framedat = {'frame': match['frame'],
+                        'time': match['timeSecs']}
+        for key in colKeyPairs:
+            if key in match:
+                framedat[colKeyPairs[key]] = match[key]
+            else:
+                framedat[colKeyPairs[key]] = np.nan
         entries[entry] = pd.Series(framedat).to_frame().T
 
     if len(entries) > 0:
-        if computePDtrace:
-            pdDf = pd.concat(entries,ignore_index = True)[['frame', 'time', 'pdsig', 'imgfsig']]#.drop_duplicates()
-        else:
-            pdDf = pd.concat(entries,ignore_index = True)[['frame', 'time','imgfsig']]#.drop_duplicates()
+        #pdDf = pd.concat(entries,ignore_index = True)[['frame', 'time','imgfsig']]#.drop_duplicates()
+        pdDf = pd.concat(entries,ignore_index = True)[['frame', 'time']+list(colKeyPairs.values())]#.drop_duplicates()
         return pdDf
     else:
         return pd.DataFrame()
@@ -484,23 +484,20 @@ def ftTrajDfFromLog(directory, filename):
     ftTrajDf = pd.read_csv(directory+"/"+filename,usecols=cols,names=colnames)
     return ftTrajDf
 
-def timeseriesDfFromLog(dat, computePDtrace=True, **posDfKeyWargs):
+def timeseriesDfFromLog(dat, colKeyPairs={'imgFrameTrigger':'imgfsig', 'tracePD':'pdsig'}, **posDfKeyWargs):
     
 
     posDf = pd.DataFrame(columns=posDfCols)
     ftDf = pd.DataFrame(columns=ftDfCols)
     dtDf = pd.DataFrame(columns=dtDfCols)
 
-    if computePDtrace:
-        pdDf = pd.DataFrame(columns = ['frame','time','pdsig', 'imgfsig'])
-    else:
-        pdDf = pd.DataFrame(columns = ['frame','time', 'imgfsig'])
+    pdDf = pd.DataFrame(columns = ['frame', 'time']+list(colKeyPairs.values())) #['frame','time','pdsig','imgfsig']
 
     posDf = posDfFromLog(dat,**posDfKeyWargs)
     ftDf = ftDfFromLog(dat)
     dtDf = dtDfFromLog(dat)
 
-    try: pdDf = pdDfFromLog(dat, computePDtrace)
+    try: pdDf = pdDfFromLog(dat, colKeyPairs=colKeyPairs)
     except: print("No analog input data was recorded.")
 
     if len(posDf) > 0: posDf.time = posDf.time-posDf.time[0]
@@ -520,7 +517,7 @@ def timeseriesDfFromLog(dat, computePDtrace=True, **posDfKeyWargs):
 
         nidDf = pd.merge(dtDf, pdDf, on="frame", how='left').rename(columns={'time_x':'time'}).drop(['time_y'],axis=1)
 
-        if computePDtrace:
+        if 'pdsig' in nidDf.columns:
             nidDf["pdFilt"]  = nidDf.pdsig.values
             nidDf.pdFilt.values[np.isfinite(nidDf.pdsig.values)] = medfilt(nidDf.pdsig.values[np.isfinite(nidDf.pdsig.values)])
             #nidDf["pdThresh"]  = 1*(np.asarray(nidDf.pdFilt>=np.nanmedian(nidDf.pdFilt.values)))
