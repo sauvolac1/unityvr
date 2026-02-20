@@ -15,11 +15,17 @@ from scipy.signal import medfilt
 objDfCols = ['name','collider','px','py','pz','rx','ry','rz','sx','sy','sz']
 
 posDfCols = ['frame','time','x','y','angle']
-ftDfCols = ['frame','ficTracTReadMs','ficTracTWriteMs','dx','dy','dz']
+ftDfCols = ['frame','ficTracTReadMs','ficTracTWriteMs','wx_ft','wy_ft','wz_ft']
 dtDfCols = ['frame','time','dt']
+tempDfCols = ['frame','tempReadTime','temperature']
 nidDfCols = ['frame','time','dt','pdsig','imgfsig']
 texDfCols = ['frame','time','xtex','ytex']
 vidDfCols = ['frame','time','img','duration']
+attmptDfCols = ['frame','time','dxattempt_ft','dyattempt_ft','angleattempt_ft']
+commandDfCols = ['frame', 'time', 'VoltageWritten']
+ephysDfCols = ['frame', 'time', 'Vm', 'Command']
+#pdDfCols = ['frame', 'time', 'pdsig', 'imgfsig']
+
 # Data class definition
 
 @dataclass
@@ -34,12 +40,17 @@ class unityVRexperiment:
     # timeseries data
     posDf: pd.DataFrame = pd.DataFrame(columns=posDfCols)
     ftDf: pd.DataFrame = pd.DataFrame(columns=ftDfCols)
+    commandDf: pd.DataFrame = pd.DataFrame(columns=commandDfCols)
+    ephysDf: pd.DataFrame = pd.DataFrame(columns=ephysDfCols)
     nidDf: pd.DataFrame = pd.DataFrame(columns=nidDfCols)
     texDf: pd.DataFrame = pd.DataFrame(columns=texDfCols)
     vidDf: pd.DataFrame = pd.DataFrame(columns=vidDfCols)
+    attmptDf: pd.DataFrame = pd.DataFrame(columns=attmptDfCols)
+    #pdDf: pd.DataFrame = pd.DataFrame(columns=pdDfCols)
     shapeDf: pd.DataFrame = pd.DataFrame()
     timeDf: pd.DataFrame = pd.DataFrame()
     flightDf: pd.DataFrame = pd.DataFrame()
+    tempDf: pd.DataFrame = pd.DataFrame()
 
     # object locations
     objDf: pd.DataFrame = pd.DataFrame(columns=objDfCols)
@@ -74,63 +85,34 @@ class unityVRexperiment:
         self.nidDf.to_csv(sep.join([savepath,'nidDf.csv']))
         self.texDf.to_csv(sep.join([savepath,'texDf.csv']))
         self.vidDf.to_csv(sep.join([savepath,'vidDf.csv']))
+        self.attmptDf.to_csv(sep.join([savepath,'attmptDf.csv']))
         self.shapeDf.to_csv(sep.join([savepath,'shapeDf.csv']))
         self.timeDf.to_csv(sep.join([savepath,'timeDf.csv']))
         self.flightDf.to_csv(sep.join([savepath,'flightDf.csv']))
+        self.tempDf.to_csv(sep.join([savepath,'tempDf.csv']))
+        self.commandDf.to_csv(sep.join([savepath,'commandDf.csv']))
+        self.ephysDf.to_csv(sep.join([savepath,'ephysDf.csv']))
+        #self.pdDf.to_csv(sep.join([savepath,'pdDf.csv']))
 
         return savepath
 
-# extract all dataframes from log file and save to disk
-def convertJsonToPandas(dirName,fileName,saveDir, computePDtrace):
-
-    dat = openUnityLog(dirName, fileName)
-    metadat = makeMetaDict(dat, fileName)
-
-    saveName = (metadat['expid']).split('_')[-1] + '/' + metadat['trial']
-    savepath = sep.join([saveDir,saveName,'uvr'])
-
-    # make directory
-    if not exists(savepath): makedirs(savepath)
-
-    # save metadata
-    with open(sep.join([savepath,'metadata.json']), 'w') as outfile:
-        json.dump(metadat, outfile,indent=4)
-
-    # construct and save object dataframe
-    objDf = objDfFromLog(dat)
-    objDf.to_csv(sep.join([savepath,'objDf.csv']))
-
-    # construct and save position and velocity dataframes
-    posDf, ftDf, nidDf = timeseriesDfFromLog(dat, computePDtrace)
-    posDf.to_csv(sep.join([savepath,'posDf.csv']))
-    del posDf 
-    ftDf.to_csv(sep.join([savepath,'ftDf.csv']))
-    del ftDf 
-    nidDf.to_csv(sep.join([savepath,'nidDf.csv']))
-    del nidDf 
-
-    # construct and save texture dataframes
-    texDf = texDfFromLog(dat)
-    vidDf = vidDfFromLog(dat)
-    texDf.to_csv(sep.join([savepath,'texDf.csv']))
-    del texDf 
-    vidDf.to_csv(sep.join([savepath,'vidDf.csv']))
-    del vidDf 
-
-    return savepath
-
 # constructor for unityVRexperiment
-def constructUnityVRexperiment(dirName,fileName,computePDtrace = True,**kwargs):
+def constructUnityVRexperiment(dirName,fileName,computePDtrace = True,enforce_cm = False,replay=False,**kwargs):
 
     dat = openUnityLog(dirName, fileName)
 
     metadat = makeMetaDict(dat, fileName)
-    objDf = objDfFromLog(dat)
-    posDf, ftDf, nidDf = timeseriesDfFromLog(dat, computePDtrace, **kwargs)
+    objDf = objDfFromLog(dat, enforce_cm=enforce_cm)
+    posDf, ftDf, nidDf = timeseriesDfFromLog(dat, computePDtrace, enforce_cm=enforce_cm, **kwargs)
     texDf = texDfFromLog(dat)
     vidDf = vidDfFromLog(dat)
+    attmptDf = attmptDfFromLog(dat, enforce_cm=enforce_cm)
+    tempDf = tempDfFromLog(dat)
+    commandDf = commandDfFromLog(dat)
+    ephysDf = ephysDfFromLog(dat)
+    #pdDf = pdDfFromLog(dat)
 
-    uvrexperiment = unityVRexperiment(metadata=metadat,posDf=posDf,ftDf=ftDf,nidDf=nidDf,objDf=objDf,texDf=texDf, vidDf=vidDf)
+    uvrexperiment = unityVRexperiment(metadata=metadat,posDf=posDf,ftDf=ftDf,nidDf=nidDf,objDf=objDf,texDf=texDf, vidDf=vidDf, attmptDf=attmptDf, tempDf=tempDf, commandDf=commandDf, ephysDf=ephysDf)
 
     return uvrexperiment
 
@@ -154,6 +136,11 @@ def loadUVRData(savepath):
         vidDf = pd.DataFrame()
         #No static images were displayed, fill with empty DataFrame
 
+    try: attmptDf = pd.read_csv(sep.join([savepath,'attmptDf.csv'])).drop(columns=['Unnamed: 0'])
+    except FileNotFoundError:
+        attmptDf = pd.DataFrame()
+        #no deviation between fictrac and unity
+
     try: shapeDf = pd.read_csv(sep.join([savepath,'shapeDf.csv'])).drop(columns=['Unnamed: 0'])
     except FileNotFoundError:
         shapeDf = pd.DataFrame()
@@ -174,8 +161,23 @@ def loadUVRData(savepath):
         nidDf = pd.DataFrame()
         #Nidaq dataframe may not have been extracted from the raw data due to memory/time constraints
 
+    try: tempDf = pd.read_csv(sep.join([savepath,'tempDf.csv'])).drop(columns=['Unnamed: 0'])
+    except FileNotFoundError:
+        tempDf = pd.DataFrame()
+        #No temperature time series was recorded with this experiment, fill with empty DataFrame
+
+    try: commandDf = pd.read_csv(sep.join([savepath,'commandDf.csv'])).drop(columns=['Unnamed: 0'])
+    except FileNotFoundError:
+        commandDf = pd.DataFrame()
+        #No command time series was recorded with this experiment, fill with empty DataFrame
+
+    try: ephysDf = pd.read_csv(sep.join([savepath,'ephysDf.csv'])).drop(columns=['Unnamed: 0'])
+    except FileNotFoundError:
+        ephysDf = pd.DataFrame()
+        #No ephys time series was recorded with this experiment, fill with empty DataFrame
+
     uvrexperiment = unityVRexperiment(metadata=metadat,posDf=posDf,ftDf=ftDf,nidDf=nidDf,
-                                      objDf=objDf,texDf=texDf,shapeDf=shapeDf,timeDf=timeDf, vidDf=vidDf, flightDf=flightDf)
+                                      objDf=objDf,texDf=texDf,shapeDf=shapeDf,timeDf=timeDf, vidDf=vidDf, flightDf=flightDf, attmptDf=attmptDf, tempDf=tempDf, commandDf=commandDf, ephysDf = ephysDf)
 
     return uvrexperiment
 
@@ -190,8 +192,8 @@ def parseHeader(notes, headerwords, metadat):
 
 
 def makeMetaDict(dat, fileName):
-    headerwords = ["expid", "experiment", "genotype","flyid","sex","notes","\n"]
-    metadat = ['testExp', 'test experiment', 'testGenotype', 'NA', 'NA', "NA"]
+    headerwords = ["expid", "experiment", "genotype","flyid","sex","notes","temperature","\n"]
+    metadat = ['testExp', 'test experiment', 'testGenotype', 'NA', 'NA', "NA", "NA"]
 
     if 'headerNotes' in dat[0].keys():
         headerNotes = dat[0]['headerNotes']
@@ -203,15 +205,11 @@ def makeMetaDict(dat, fileName):
     if len(matching) == 0:
         print('no fictrac metadata')
         ballRad = 0.0
-    else:
-        ballRad = matching[0]["ficTracBallRadius"]
-
-    matching = [s for s in dat if "translationalGain" in s]
-    if len(matching) == 0:
-        print('No gain in metadata')
         translationalGain = 1.0
     else:
-        translationalGain = matching[0]["translationalGain"]
+        ballRad = matching[0]["ficTracBallRadius"]
+        try: translationalGain = matching[0]["translationalGain"]
+        except: translationalGain = 1.0
 
     matching = [s for s in dat if "refreshRateHz" in s]
     setFrameRate = matching[0]["refreshRateHz"]
@@ -226,9 +224,10 @@ def makeMetaDict(dat, fileName):
         'date': datestr,
         'time': timestr,
         'ballRad': ballRad,
-        'translationalGain' : translationalGain,
+        'translationalGain': translationalGain,
         'setFrameRate': setFrameRate,
         'notes': metadat[5],
+        'temperature': metadat[6],
         'angle_convention':"right-handed"
     }
 
@@ -252,21 +251,33 @@ def openUnityLog(dirName, fileName):
 
 # Functions for extracting data from log file and converting it to pandas dataframe
 
-def objDfFromLog(dat):
+def objDfFromLog(dat, enforce_cm = False):
     # get dataframe with info about objects in vr
     matching = [s for s in dat if "meshGameObjectPath" in s]
+    matchingRad = [s for s in dat if "ficTracBallRadius" in s]
+    if 'translationalGain' in matchingRad[0]:
+        gainVal = matchingRad[0]['translationalGain']
+    else:
+        gainVal = 1.0
+    if gainVal == 0:
+        warnings.warn('Translational gain is zero. Object sizes will not be modified.')
+        gainVal = 1.0
+    if enforce_cm:
+        convf = 10.0
+    else:
+        convf = 1.0
     entries = [None]*len(matching)
     for entry, match in enumerate(matching):
         framedat = {'name': match['meshGameObjectPath'],
                     'collider': match['colliderType'],
-                    'px': match['worldPosition']['x'],
-                    'py': match['worldPosition']['z'],
+                    'px': match['worldPosition']['x']/gainVal*convf,
+                    'py': match['worldPosition']['z']/gainVal*convf,
                     'pz': match['worldPosition']['y'],
                     'rx': match['worldRotationDegs']['x'],
                     'ry': match['worldRotationDegs']['z'],
                     'rz': match['worldRotationDegs']['y'],
-                    'sx': match['worldScale']['x'],
-                    'sy': match['worldScale']['z'],
+                    'sx': match['worldScale']['x']/gainVal*convf,
+                    'sy': match['worldScale']['z']/gainVal*convf,
                     'sz': match['worldScale']['y']}
         entries[entry] = pd.Series(framedat).to_frame().T
     if len(entries) > 0:
@@ -275,27 +286,39 @@ def objDfFromLog(dat):
         return pd.DataFrame()
 
 
-def posDfFromLog(dat, posDfKey='attemptedTranslation', fictracSubject=None):
+def posDfFromLog(dat, posDfKey='attemptedTranslation', fictracSubject=None, ignoreKeys=['meshGameObjectPath'], enforce_cm = False):
     # get info about camera position in vr
-    matching = [s for s in dat if posDfKey in s] #checks key to extract from that particular dump
+    matching = [s for s in dat if ((posDfKey in s) & (np.all([i not in s for i in ignoreKeys])))] #checks key to extract from that particular dump
+    matchingRad = [s for s in dat if "ficTracBallRadius" in s]
+    if 'translationalGain' in matchingRad[0]:
+        gainVal = matchingRad[0]['translationalGain']
+    else:
+        gainVal = 1.0
+    if gainVal == 0:
+        warnings.warn('Translational gain is zero. Fly remains stationary in the world.')
+        gainVal = np.inf
+    if enforce_cm:
+        convf = 10.0
+    else:
+        convf = 1.0
     entries = [None]*len(matching)
     for entry, match in enumerate(matching):
         if fictracSubject != 'Integrated':
             framedat = {'frame': match['frame'],
                         'time': match['timeSecs'],
-                        'x': match['worldPosition']['x'],
-                        'y': match['worldPosition']['z'], #axes are named differently in Unity
+                        'x': match['worldPosition']['x']/gainVal*convf,
+                        'y': match['worldPosition']['z']/gainVal*convf, #axes are named differently in Unity
                         'angle': (-match['worldRotationDegs']['y'])%360, #flip due to left handed convention in Unity
-                        'dx': match['actualTranslation']['x'],
-                        'dy': match['actualTranslation']['z'],
-                        'dxattempt': match['attemptedTranslation']['x'],
-                        'dyattempt': match['attemptedTranslation']['z']
+                        'dx_ft': match['actualTranslation']['x']/gainVal*convf,
+                        'dy_ft': match['actualTranslation']['z']/gainVal*convf,
+                        'dxattempt_ft': match['attemptedTranslation']['x']/gainVal*convf,
+                        'dyattempt_ft': match['attemptedTranslation']['z']/gainVal*convf
                        }
         else:
             framedat = {'frame': match['frame'],
                             'time': match['timeSecs'],
-                            'x': match['worldPosition']['x'],
-                            'y': match['worldPosition']['z'], #axes are named differently in Unity
+                            'x': match['worldPosition']['x']/gainVal*convf,
+                            'y': match['worldPosition']['z']/gainVal*convf, #axes are named differently in Unity
                             'angle': (-match['worldRotationDegs']['y'])%360, #flip due to left handed convention in Unity
                         }
         entries[entry] = pd.Series(framedat).to_frame().T
@@ -315,9 +338,33 @@ def ftDfFromLog(dat):
         framedat = {'frame': match['frame'],
                         'ficTracTReadMs': match['ficTracTimestampReadMs'],
                         'ficTracTWriteMs': match['ficTracTimestampWriteMs'],
-                        'dx': match['ficTracDeltaRotationVectorLab']['x'],
-                        'dy': match['ficTracDeltaRotationVectorLab']['y'],
-                        'dz': match['ficTracDeltaRotationVectorLab']['z']}
+                        'wx_ft': match['ficTracDeltaRotationVectorLab']['x'],
+                        'wy_ft': match['ficTracDeltaRotationVectorLab']['y'],
+                        'wz_ft': match['ficTracDeltaRotationVectorLab']['z']}
+        entries[entry] = pd.Series(framedat).to_frame().T
+
+    if len(entries) > 0:
+        return pd.concat(entries, ignore_index = True)
+    else:
+        return pd.DataFrame()
+    
+
+def attmptDfFromLog(dat, enforce_cm = False):
+    # get fictrac data during open loop periods
+    matching = [s for s in dat if "fictracAttempt" in s]
+    matchingRad = [s for s in dat if "ficTracBallRadius" in s]
+    entries = [None]*len(matching)
+    if enforce_cm:
+        convf = 10.0
+    else:
+        convf = 1.0
+    for entry, match in enumerate(matching):
+        framedat = {'frame': match['frame'],
+                    'time': match['timeSecs'], 
+                        'dyattempt_ft': -match['fictracAttempt']['x']*matchingRad[0]['ficTracBallRadius']*convf, 
+                        #scale by ball radius but not by translational gain to get true x,y in unity units (dm or if enforced cm), rightward motion
+                        'dxattempt_ft': match['fictracAttempt']['y']*matchingRad[0]['ficTracBallRadius']*convf, #forward motion
+                        'angleattempt_ft': np.rad2deg(match['fictracAttempt']['z'])} #convert to degrees
         entries[entry] = pd.Series(framedat).to_frame().T
 
     if len(entries) > 0:
@@ -339,7 +386,7 @@ def dtDfFromLog(dat):
     if len(entries) > 0:
         return pd.concat(entries,ignore_index = True)
     else:
-        return pd.DataFrame()
+        pd.DataFrame()
 
 
 def pdDfFromLog(dat, computePDtrace):
@@ -412,7 +459,69 @@ def vidDfFromLog(dat):
         return pd.concat(entries,ignore_index = True)
     else:
         return pd.DataFrame()
+    
 
+def tempDfFromLog(dat):
+    # get static image presentations and times
+    matching = [s for s in dat if "temperature" in s]
+    if len(matching) == 0: return pd.DataFrame()
+
+    entries = [None]*len(matching)
+    for entry, match in enumerate(matching):
+        framedat = {'frame': match['frame'],
+                    'tempReadTime': match['timeSecs'],
+                    'temperature': match['temperature']
+                    }
+        entries[entry] = pd.Series(framedat).to_frame().T
+    
+    if len(entries) > 0:
+        tempDf = pd.concat(entries,ignore_index = True).groupby('frame').mean().reset_index() #average over multiple temperature readings per unity frame
+        dtDf = dtDfFromLog(dat) #get the frame times
+        if len(dtDf)>0: tempDf = pd.merge(dtDf, tempDf, on="frame", how='outer')
+        return tempDf
+    else:
+        print('No temperature data was recorded.')
+        return pd.DataFrame()
+
+
+def commandDfFromLog(dat):
+    # get command voltage log
+    matching = [s for s in dat if "VoltageWritten" in s]
+    if len(matching) == 0: return pd.DataFrame()
+
+    entries = [None]*len(matching)
+    for entry, match in enumerate(matching):
+        framedat = {'frame': match['frame'],
+                    'time': match['timeSecs'],
+                    'VoltageWritten': match['VoltageWritten']
+                    }
+        entries[entry] = pd.Series(framedat).to_frame().T
+
+    if len(entries) > 0:
+        return pd.concat(entries,ignore_index = True)
+    else:
+        print('No command voltage data was recorded.')
+        return pd.DataFrame()
+    
+def ephysDfFromLog(dat):
+    # get command voltage log
+    matching = [s for s in dat if "vm_mv" in s]
+    if len(matching) == 0: return pd.DataFrame()
+
+    entries = [None]*len(matching)
+    for entry, match in enumerate(matching):
+        framedat = {'frame': match['frame'],
+                    'time': match['timeSecs'],
+                    'Vm': match['vm_mv'],
+                    'Command': match['command_pa']
+                    }
+        entries[entry] = pd.Series(framedat).to_frame().T
+
+    if len(entries) > 0:
+        return pd.concat(entries,ignore_index = True)
+    else:
+        print('No ephys data was recorded.')
+        return pd.DataFrame()
 
 def ftTrajDfFromLog(directory, filename):
     cols = [14,15,16,17,18]
@@ -426,6 +535,7 @@ def timeseriesDfFromLog(dat, computePDtrace=True, **posDfKeyWargs):
     posDf = pd.DataFrame(columns=posDfCols)
     ftDf = pd.DataFrame(columns=ftDfCols)
     dtDf = pd.DataFrame(columns=dtDfCols)
+
     if computePDtrace:
         pdDf = pd.DataFrame(columns = ['frame','time','pdsig', 'imgfsig'])
     else:
@@ -434,13 +544,17 @@ def timeseriesDfFromLog(dat, computePDtrace=True, **posDfKeyWargs):
     posDf = posDfFromLog(dat,**posDfKeyWargs)
     ftDf = ftDfFromLog(dat)
     dtDf = dtDfFromLog(dat)
-
+    #includes frame clock from ScanImage as well as photodiode trace
     try: pdDf = pdDfFromLog(dat, computePDtrace)
     except: print("No analog input data was recorded.")
 
+
+    
     if len(posDf) > 0: posDf.time = posDf.time-posDf.time[0]
     if len(dtDf) > 0: dtDf.time = dtDf.time-dtDf.time[0]
     if len(pdDf) > 0: pdDf.time = pdDf.time-pdDf.time[0]
+    if ((len(posDf)>0)&(len(pdDf)>0)&(len(dtDf)>0)):
+        print('pdDf time:', pdDf.time[0], 'posDf time:', posDf.time[0], 'dtDf time:', dtDf.time[0]) 
 
     if len(ftDf) > 0:
         ftDf.ficTracTReadMs = ftDf.ficTracTReadMs-ftDf.ficTracTReadMs[0]
@@ -448,15 +562,17 @@ def timeseriesDfFromLog(dat, computePDtrace=True, **posDfKeyWargs):
     else:
         print("No fictrac signal was recorded.")
 
-    if len(dtDf) > 0: posDf = pd.merge(dtDf, posDf, on="frame", how='outer').rename(columns={'time_x':'time'}).drop(['time_y'],axis=1)
+    if len(dtDf) > 0: 
+        posDf = pd.merge(dtDf, posDf, on="frame", how='outer').rename(columns={'time_x':'time'}).drop(['time_y'],axis=1)
 
     if len(pdDf) > 0 and len(dtDf) > 0:
 
         nidDf = pd.merge(dtDf, pdDf, on="frame", how='left').rename(columns={'time_x':'time'}).drop(['time_y'],axis=1)
+
         if computePDtrace:
             nidDf["pdFilt"]  = nidDf.pdsig.values
             nidDf.pdFilt.values[np.isfinite(nidDf.pdsig.values)] = medfilt(nidDf.pdsig.values[np.isfinite(nidDf.pdsig.values)])
-            nidDf["pdThresh"]  = 1*(np.asarray(nidDf.pdFilt>=np.nanmedian(nidDf.pdFilt.values)))
+            #nidDf["pdThresh"]  = 1*(np.asarray(nidDf.pdFilt>=np.nanmedian(nidDf.pdFilt.values)))
 
         #nidDf["imgfFilt"]  = nidDf.imgfsig.values
         #nidDf.imgfFilt.values[np.isfinite(nidDf.imgfsig.values)] = medfilt(nidDf.imgfsig.values[np.isfinite(nidDf.imgfsig.values)])
@@ -527,4 +643,45 @@ def generateInterTime(tsDf):
     tsDf['timeinterp'] = np.clip(timeinterp_f(frameIndx), timeAtFramestart[0], timeAtFramestart[-1])
 
     return tsDf
+'''
+
+# extract all dataframes from log file and save to disk
+'''  # Not sure why this exists, will be deprecated
+def convertJsonToPandas(dirName,fileName,saveDir, computePDtrace):
+
+    dat = openUnityLog(dirName, fileName)
+    metadat = makeMetaDict(dat, fileName)
+
+    saveName = (metadat['expid']).split('_')[-1] + '/' + metadat['trial']
+    savepath = sep.join([saveDir,saveName,'uvr'])
+
+    # make directory
+    if not exists(savepath): makedirs(savepath)
+
+    # save metadata
+    with open(sep.join([savepath,'metadata.json']), 'w') as outfile:
+        json.dump(metadat, outfile,indent=4)
+
+    # construct and save object dataframe
+    objDf = objDfFromLog(dat)
+    objDf.to_csv(sep.join([savepath,'objDf.csv']))
+
+    # construct and save position and velocity dataframes
+    posDf, ftDf, nidDf = timeseriesDfFromLog(dat, computePDtrace)
+    posDf.to_csv(sep.join([savepath,'posDf.csv']))
+    del posDf 
+    ftDf.to_csv(sep.join([savepath,'ftDf.csv']))
+    del ftDf 
+    nidDf.to_csv(sep.join([savepath,'nidDf.csv']))
+    del nidDf 
+
+    # construct and save texture dataframes
+    texDf = texDfFromLog(dat)
+    vidDf = vidDfFromLog(dat)
+    texDf.to_csv(sep.join([savepath,'texDf.csv']))
+    del texDf 
+    vidDf.to_csv(sep.join([savepath,'vidDf.csv']))
+    del vidDf 
+
+    return savepath
 '''
