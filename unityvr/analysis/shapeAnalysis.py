@@ -62,15 +62,6 @@ def shape(posDf, step = None, interp='linear', stitch=False, plot = False, plots
     time_interpolator = sp.interpolate.interp1d(distance, time, kind=interp,axis=0)
     angle_interpolator = sp.interpolate.interp1d(distance, angle, kind=interp,axis=0)
 
-
-    if 'laser' in posDf:
-        laser = np.array([posDf['laser'].iloc[i] for i in sorted(idx)])
-        laser_interpolator = sp.interpolate.interp1d(distance, laser, kind='nearest',axis=0)
-        
-    if 'trial' in posDf:
-        trial = np.array([posDf['trial'].iloc[i] for i in sorted(idx)])
-        trial_interpolator = sp.interpolate.interp1d(distance, trial, kind='nearest',axis=0)
-
     shapeDf = pd.DataFrame(path_interpolator(alpha),columns = ['x','y'])
     shapeDf['time'] = time_interpolator(alpha)
     shapeDf['angle'] = angle_interpolator(alpha)
@@ -78,11 +69,6 @@ def shape(posDf, step = None, interp='linear', stitch=False, plot = False, plots
     shapeDf['dy'] = np.diff(shapeDf['y'],prepend=0)
     shapeDf['ds'] = np.sqrt((shapeDf['dx']**2)+(shapeDf['dy']**2))
     shapeDf['s'] = np.cumsum(shapeDf['ds'])
-
-    if 'laser' in posDf:
-        shapeDf['laser'] = laser_interpolator(alpha)
-        shapeDf['trial'] = trial_interpolator(alpha)
-    
 
     shapeDf = carryAttrs(shapeDf,posDf)
 

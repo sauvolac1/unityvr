@@ -256,8 +256,9 @@ def loadAndAlignPreprocessedData(root, subdir, flies, conditions, trials, panDef
 
 def addImagingTimeToSceneArr(sceneArr, uvrDat, imgDataTime, imgMetadat, timeStr = 'volumes [s]', sceneFrameStr = 'frames', **kwargs):
     expDf = generateUnityExpDf(imgDataTime, uvrDat, imgMetadat, timeStr=timeStr, **kwargs)
+    timeSubSampled = pd.merge(sceneArr[sceneFrameStr].to_series().rename('frame').reset_index(drop=True), uvrDat.posDf[['frame', 'time']], on='frame', how = 'inner')['time']
     interpF = sp.interpolate.interp1d(expDf['time'], expDf[timeStr], fill_value='extrapolate')
-    sceneArr = sceneArr.assign_coords(time = (sceneFrameStr, interpF(uvrDat.posDf['time'])))
+    sceneArr = sceneArr.assign_coords(time = (sceneFrameStr, interpF(timeSubSampled)))
     return sceneArr
 
 # take all the unity dataframes and add imaging time to them
@@ -267,6 +268,7 @@ def addImagingTimeToUvrDat(imgDataTime, uvrDat, imgMetadat, timeStr = 'volumes [
     interpF = sp.interpolate.interp1d(expDf['frame'], expDf[timeStr], fill_value='extrapolate')
     for f in  uvrDat.__dataclass_fields__:
         if dataframeAppend in f:
+            
             unityDf = getattr(uvrDat,f)
             if frameStr in unityDf:
                 unityDf[timeStr] = interpF(unityDf['frame'])
@@ -294,12 +296,15 @@ def find_upticks(signal, smoothing=3):
 #             nidDf.loc[f,'frameToAlign'] = nidDf.loc[f-1,'frameToAlign']
 #     return nidDf
 
-def alignWithPdSignal(nidDf, pdThresh=0.1, noFrameDropCorrection=True, supressPDAlignmentPlot = True, lims=[0,100]):
+def alignWithPdSignal(nidDf, pdThresh=0.1, pdClip = [0.04, 0.12], noFrameDropCorrection=True, supressPDAlignmentPlot = True, lims=[0,100]):
     # Drop NaNs and reset index for cleaner processing
-    nidDf = nidDf.dropna(subset=['pdsig']).reset_index(drop=True)
+    nidDf = nidDf.dropna(subset=['pdFilt']).reset_index(drop=True).copy()
+
+    #clip the photodiode signal to a reasonable range
+    nidDf['pdFilt'] = np.clip(nidDf['pdFilt'], pdClip[0], pdClip[1])
     
     # Find indices where pdsig crosses the threshold in either direction
-    dips = np.where(np.diff(nidDf['pdsig'] > pdThresh) != 0)[0]
+    dips = np.where(np.diff(nidDf['pdFilt'] > pdThresh) != 0)[0]
     
     # Calculate frame correction based on the first crossing point
     NcorrectionFrames = nidDf['frame'].iloc[dips[0]] - nidDf['frame'].iloc[0] + 1
@@ -317,8 +322,8 @@ def alignWithPdSignal(nidDf, pdThresh=0.1, noFrameDropCorrection=True, supressPD
 
     if not supressPDAlignmentPlot:
         _, ax = plt.subplots(figsize=(3, 1))
-        ax.plot(nidDf['pdsig'].values, label='Photodiode Signal')
-        ax.plot(dips, nidDf['pdsig'].values[dips], 'ko')
+        ax.plot(nidDf['pdFilt'].values, label='Photodiode Signal')
+        ax.plot(dips, nidDf['pdFilt'].values[dips], 'ko')
         ax.set_xlim(lims[0], lims[1])
         vutils.myAxisTheme(ax)
     
