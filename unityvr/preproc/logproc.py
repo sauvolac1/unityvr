@@ -37,8 +37,6 @@ class unityVRexperiment:
     # timeseries data
     posDf: pd.DataFrame = pd.DataFrame(columns=posDfCols)
     ftDf: pd.DataFrame = pd.DataFrame(columns=ftDfCols)
-    commandDf: pd.DataFrame = pd.DataFrame(columns=commandDfCols)
-    ephysDf: pd.DataFrame = pd.DataFrame(columns=ephysDfCols)
     nidDf: pd.DataFrame = pd.DataFrame(columns=nidDfCols)
     texDf: pd.DataFrame = pd.DataFrame(columns=texDfCols)
     vidDf: pd.DataFrame = pd.DataFrame(columns=vidDfCols)
@@ -90,13 +88,13 @@ class unityVRexperiment:
         return savepath
 
 # constructor for unityVRexperiment
-def constructUnityVRexperiment(dirName,fileName,computePDtrace = True,enforce_cm = False,**kwargs):
+def constructUnityVRexperiment(dirName,fileName,enforce_cm = False,colKeyPairs={'imgFrameTrigger':'imgfsig', 'tracePD':'pdsig'},**kwargs):
 
     dat = openUnityLog(dirName, fileName)
 
     metadat = makeMetaDict(dat, fileName)
     objDf = objDfFromLog(dat, enforce_cm=enforce_cm)
-    posDf, ftDf, nidDf = timeseriesDfFromLog(dat, computePDtrace, enforce_cm=enforce_cm, **kwargs)
+    posDf, ftDf, nidDf = timeseriesDfFromLog(dat, colKeyPairs=colKeyPairs, enforce_cm=enforce_cm, **kwargs)
     texDf = texDfFromLog(dat)
     vidDf = vidDfFromLog(dat)
     attmptDf = attmptDfFromLog(dat, enforce_cm=enforce_cm)
@@ -478,45 +476,6 @@ def tempDfFromLog(dat):
         print('No temperature data was recorded.')
         return pd.DataFrame()
 
-
-def commandDfFromLog(dat):
-    # get command voltage log
-    matching = [s for s in dat if "VoltageWritten" in s]
-    if len(matching) == 0: return pd.DataFrame()
-
-    entries = [None]*len(matching)
-    for entry, match in enumerate(matching):
-        framedat = {'frame': match['frame'],
-                    'time': match['timeSecs'],
-                    'VoltageWritten': match['VoltageWritten']
-                    }
-        entries[entry] = pd.Series(framedat).to_frame().T
-
-    if len(entries) > 0:
-        return pd.concat(entries,ignore_index = True)
-    else:
-        print('No command voltage data was recorded.')
-        return pd.DataFrame()
-    
-def ephysDfFromLog(dat):
-    # get command voltage log
-    matching = [s for s in dat if "vm_mv" in s]
-    if len(matching) == 0: return pd.DataFrame()
-
-    entries = [None]*len(matching)
-    for entry, match in enumerate(matching):
-        framedat = {'frame': match['frame'],
-                    'time': match['timeSecs'],
-                    'Vm': match['vm_mv'],
-                    'Command': match['command_pa']
-                    }
-        entries[entry] = pd.Series(framedat).to_frame().T
-
-    if len(entries) > 0:
-        return pd.concat(entries,ignore_index = True)
-    else:
-        print('No ephys data was recorded.')
-        return pd.DataFrame()
 
 def ftTrajDfFromLog(directory, filename):
     cols = [14,15,16,17,18]
