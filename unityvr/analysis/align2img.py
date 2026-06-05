@@ -296,9 +296,14 @@ def find_upticks(signal, smoothing=3):
 #             nidDf.loc[f,'frameToAlign'] = nidDf.loc[f-1,'frameToAlign']
 #     return nidDf
 
-def alignWithPdSignal(nidDf, pdThresh=0.1, pdClip = [0.04, 0.12], noFrameDropCorrection=True, supressPDAlignmentPlot = True, lims=[0,100]):
+def alignWithPdSignal(nidDf, pdThresh=0.1, pdClip = [0.04, 0.12], noFrameDropCorrection=True, supressPDAlignmentPlot = True, lims=[0,100], filter=False, butterworthParameters = [3, 0.04]):
     # Drop NaNs and reset index for cleaner processing
     nidDf = nidDf.dropna(subset=['pdFilt']).reset_index(drop=True).copy()
+
+    #butterworth filter the photodiode signal to remove high frequency noise
+    if filter:
+        b, a = sp.signal.butter(butterworthParameters[0], butterworthParameters[1])  # normalized cutoff
+        nidDf['pdFilt'] = sp.signal.filtfilt(b, a, nidDf['pdFilt'].values)
 
     #clip the photodiode signal to a reasonable range
     nidDf['pdFilt'] = np.clip(nidDf['pdFilt'], pdClip[0], pdClip[1])
